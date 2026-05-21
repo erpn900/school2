@@ -78,8 +78,8 @@
 
   /* ── Redirect if already logged in ──────────────────────── */
   (() => {
-    if (API.isLoggedIn()) {
-      const u = API.getUser();
+    const u = API.getUser();
+    if (u) {
       window.location.replace(`pages/${u.role}-dashboard.html`);
     }
   })();
@@ -102,7 +102,7 @@
         document.getElementById('password').value,
         selectedRole
       );
-      window.location.replace(`pages/${data.role}-dashboard.html`);
+      window.location.replace(`pages/${data.role || selectedRole}-dashboard.html`);
     } catch (err) {
       errBox.textContent   = err.message || 'Login failed. Please try again.';
       errBox.style.display = 'block';
