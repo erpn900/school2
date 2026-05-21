@@ -5,6 +5,7 @@
  */
 const API = (() => {
   const STORAGE_KEY = 'schoolama_user';
+  const VALID_ROLES = ['admin', 'teacher', 'student', 'parent'];
 
   /**
    * Core fetch wrapper with timeout & error handling
@@ -37,10 +38,38 @@ const API = (() => {
 
   /* ── Auth ─────────────────────────────────────────────────── */
 
+  function normalizeRole(role, fallbackRole = '') {
+    const normalized = String(role || fallbackRole).trim().toLowerCase();
+    return VALID_ROLES.includes(normalized) ? normalized : '';
+  }
+
+  function normalizeUserResponse(data, fallbackRole = '') {
+    if (!data || typeof data !== 'object') return null;
+
+    const payload = data.data && typeof data.data === 'object' ? data.data : data;
+    const source = payload.user && typeof payload.user === 'object'
+      ? payload.user
+      : data.user && typeof data.user === 'object'
+        ? data.user
+        : payload;
+
+    const role = normalizeRole(source.role || payload.role || data.role, fallbackRole);
+    if (!role) return null;
+
+    return {
+      ...source,
+      token: source.token || payload.token || data.token || '',
+      role,
+    };
+  }
+
   async function login(username, password, role) {
     const data = await request({ action: 'login', username, password, role });
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    return data;
+    const user = normalizeUserResponse(data, role);
+    if (!user) throw new Error('Login succeeded, but the user role was not returned.');
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    return user;
   }
 
   function logout() {
@@ -50,8 +79,18 @@ const API = (() => {
   function getUser() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : null;
+      const parsed = raw ? JSON.parse(raw) : null;
+      const user = normalizeUserResponse(parsed);
+
+      if (parsed && !user) {
+        localStorage.removeItem(STORAGE_KEY);
+      } else if (user && JSON.stringify(user) !== raw) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+      }
+
+      return user;
     } catch {
+      localStorage.removeItem(STORAGE_KEY);
       return null;
     }
   }
@@ -59,42 +98,3 @@ const API = (() => {
   function isLoggedIn() {
     return !!getUser();
   }
-
-  /* ── CRUD helpers ─────────────────────────────────────────── */
-
-  function getAuthParams() {
-    const u = getUser();
-    if (!u) throw new Error('Not authenticated');
-    return { token: u.token };
-  }
-
-  async function listRecords(sheet, page = 1, pageSize = 20, search = '') {
-    return request({ action: 'list', sheet, page, pageSize, search, ...getAuthParams() });
-  }
-
-  async function getRecord(sheet, id) {
-    return request({ action: 'get', sheet, id, ...getAuthParams() });
-  }
-
-  async function createRecord(sheet, fields) {
-    return request({ action: 'create', sheet, fields: JSON.stringify(fields), ...getAuthParams() });
-  }
-
-  async function updateRecord(sheet, id, fields) {
-    return request({ action: 'update', sheet, id, fields: JSON.stringify(fields), ...getAuthParams() });
-  }
-
-  async function deleteRecord(sheet, id) {
-    return request({ action: 'delete', sheet, id, ...getAuthParams() });
-  }
-
-  async function getDashboard() {
-    return request({ action: 'dashboard', ...getAuthParams() });
-  }
-
-  return {
-    login, logout, getUser, isLoggedIn,
-    listRecords, getRecord, createRecord, updateRecord, deleteRecord,
-    getDashboard,
-  };
-})();
