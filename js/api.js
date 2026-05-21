@@ -5,6 +5,7 @@
  */
 const API = (() => {
   const STORAGE_KEY = 'schoolama_user';
+  const SESSION_STORAGE_KEY = 'schoolama_session_user';
   const VALID_ROLES = ['admin', 'teacher', 'student', 'parent'];
 
   /**
@@ -38,6 +39,27 @@ const API = (() => {
 
   /* ── Auth ─────────────────────────────────────────────────── */
 
+  function pickField(obj, names) {
+    if (!obj || typeof obj !== 'object') return undefined;
+
+    for (const name of names) {
+      if (obj[name] !== undefined && obj[name] !== null && obj[name] !== '') {
+        return obj[name];
+      }
+    }
+
+    const entries = Object.entries(obj);
+    for (const name of names) {
+      const lowerName = name.toLowerCase();
+      const match = entries.find(([key, value]) =>
+        key.toLowerCase() === lowerName && value !== undefined && value !== null && value !== ''
+      );
+      if (match) return match[1];
+    }
+
+    return undefined;
+  }
+
   function normalizeRole(role, fallbackRole = '') {
     const normalized = String(role || fallbackRole).trim().toLowerCase();
     return VALID_ROLES.includes(normalized) ? normalized : '';
@@ -46,21 +68,86 @@ const API = (() => {
   function normalizeUserResponse(data, fallbackRole = '') {
     if (!data || typeof data !== 'object') return null;
 
-    const payload = data.data && typeof data.data === 'object' ? data.data : data;
-    const source = payload.user && typeof payload.user === 'object'
-      ? payload.user
-      : data.user && typeof data.user === 'object'
-        ? data.user
-        : payload;
+    const wrappedPayload = pickField(data, ['data', 'result', 'payload', 'response']);
+    const payload = wrappedPayload && typeof wrappedPayload === 'object' ? wrappedPayload : data;
+    const source = pickField(payload, ['user', 'account', 'profile'])
+      || pickField(data, ['user', 'account', 'profile'])
+      || payload;
 
-    const role = normalizeRole(source.role || payload.role || data.role, fallbackRole);
+    if (!source || typeof source !== 'object') return null;
+
+    const role = normalizeRole(
+      pickField(source, ['role', 'userRole', 'user_type', 'userType', 'type'])
+        || pickField(payload, ['role', 'userRole', 'user_type', 'userType', 'type'])
+        || pickField(data, ['role', 'userRole', 'user_type', 'userType', 'type']),
+      fallbackRole
+    );
     if (!role) return null;
 
     return {
       ...source,
-      token: source.token || payload.token || data.token || '',
+      username: pickField(source, ['username', 'userName', 'email', 'id']) || '',
+      name: pickField(source, ['name', 'fullName', 'displayName']) || pickField(source, ['username', 'userName', 'email']) || '',
+      token: pickField(source, ['token', 'authToken', 'sessionToken', 'accessToken'])
+        || pickField(payload, ['token', 'authToken', 'sessionToken', 'accessToken'])
+        || pickField(data, ['token', 'authToken', 'sessionToken', 'accessToken'])
+        || '',
       role,
     };
+  }
+
+  function getStorage(name) {
+    try {
+      return window?.[name] || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function safeGet(storage, key) {
+    try {
+      return storage?.getItem(key) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function safeSet(storage, key, value) {
+    try {
+      if (!storage) return false;
+      storage.setItem(key, value);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function safeRemove(storage, key) {
+    try {
+      storage?.removeItem(key);
+    } catch {
+      // Ignore storage cleanup failures.
+    }
+  }
+
+  function getStoredUserRaw() {
+    return safeGet(getStorage('localStorage'), STORAGE_KEY)
+      || safeGet(getStorage('sessionStorage'), SESSION_STORAGE_KEY);
+  }
+
+  function saveUser(user, required = false) {
+    const raw = JSON.stringify(user);
+    const savedLocal = safeSet(getStorage('localStorage'), STORAGE_KEY, raw);
+    const savedSession = safeSet(getStorage('sessionStorage'), SESSION_STORAGE_KEY, raw);
+
+    if (required && !savedLocal && !savedSession) {
+      throw new Error('Your browser blocked session storage. Please allow site data and try again.');
+    }
+  }
+
+  function clearUser() {
+    safeRemove(getStorage('localStorage'), STORAGE_KEY);
+    safeRemove(getStorage('sessionStorage'), SESSION_STORAGE_KEY);
   }
 
   async function login(username, password, role) {
@@ -68,29 +155,29 @@ const API = (() => {
     const user = normalizeUserResponse(data, role);
     if (!user) throw new Error('Login succeeded, but the user role was not returned.');
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    saveUser(user, true);
     return user;
   }
 
   function logout() {
-    localStorage.removeItem(STORAGE_KEY);
+    clearUser();
   }
 
   function getUser() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = getStoredUserRaw();
       const parsed = raw ? JSON.parse(raw) : null;
       const user = normalizeUserResponse(parsed);
 
       if (parsed && !user) {
-        localStorage.removeItem(STORAGE_KEY);
+        clearUser();
       } else if (user && JSON.stringify(user) !== raw) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+        saveUser(user);
       }
 
       return user;
     } catch {
-      localStorage.removeItem(STORAGE_KEY);
+      clearUser();
       return null;
     }
   }
@@ -98,3 +185,42 @@ const API = (() => {
   function isLoggedIn() {
     return !!getUser();
   }
+
+  /* ── CRUD helpers ─────────────────────────────────────────── */
+
+  function getAuthParams() {
+    const u = getUser();
+    if (!u) throw new Error('Not authenticated');
+    return { token: u.token };
+  }
+
+  async function listRecords(sheet, page = 1, pageSize = 20, search = '') {
+    return request({ action: 'list', sheet, page, pageSize, search, ...getAuthParams() });
+  }
+
+  async function getRecord(sheet, id) {
+    return request({ action: 'get', sheet, id, ...getAuthParams() });
+  }
+
+  async function createRecord(sheet, fields) {
+    return request({ action: 'create', sheet, fields: JSON.stringify(fields), ...getAuthParams() });
+  }
+
+  async function updateRecord(sheet, id, fields) {
+    return request({ action: 'update', sheet, id, fields: JSON.stringify(fields), ...getAuthParams() });
+  }
+
+  async function deleteRecord(sheet, id) {
+    return request({ action: 'delete', sheet, id, ...getAuthParams() });
+  }
+
+  async function getDashboard() {
+    return request({ action: 'dashboard', ...getAuthParams() });
+  }
+
+  return {
+    login, logout, getUser, isLoggedIn,
+    listRecords, getRecord, createRecord, updateRecord, deleteRecord,
+    getDashboard,
+  };
+})();
