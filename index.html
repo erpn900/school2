@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SchooLama – School Management System">
+  <title>SchooLama – Sign In</title>
+  <link rel="icon" href="favicon.ico">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Backend URL (replace YOUR_DEPLOYMENT_ID) -->
+  <script>
+    window.BACKEND_URL = 'https://script.google.com/macros/s/AKfycbz42jbxkFCmq0F9F8jo7kka9PuYraYBO8vU1z0FSkVRxmHVt069gy9JYdP06K5-vrECRw/exec';
+  </script>
+</head>
+<body>
+
+<div class="login-wrapper">
+  <div class="login-card">
+
+    <!-- Logo -->
+    <div class="login-logo">
+      <div class="logo-brand-row">
+        <img src="assets/lama/logo.png" alt="SchooLama logo"
+             onerror="this.style.display='none'">
+        <h1>SchooLama</h1>
+      </div>
+      <p>Sign in to your account</p>
+    </div>
+
+    <!-- Role tabs -->
+    <div class="role-tabs" role="tablist" aria-label="Select role">
+      <button class="role-tab active" data-role="admin"   role="tab" aria-selected="true">Admin</button>
+      <button class="role-tab"        data-role="teacher" role="tab" aria-selected="false">Teacher</button>
+      <button class="role-tab"        data-role="student" role="tab" aria-selected="false">Student</button>
+      <button class="role-tab"        data-role="parent"  role="tab" aria-selected="false">Parent</button>
+    </div>
+
+    <!-- Form -->
+    <form id="login-form" novalidate>
+      <div class="form-group">
+        <label class="form-label" for="username">Username</label>
+        <input id="username" name="username" class="form-control"
+               placeholder="Enter your username" required autofocus autocomplete="username">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input id="password" name="password" type="password" class="form-control"
+               placeholder="Enter your password" required autocomplete="current-password">
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="login-btn">Sign In</button>
+
+      <div id="login-err" role="alert" aria-live="polite"></div>
+    </form>
+
+    <div class="login-hint">
+      Default admin: <strong>admin</strong> / <strong>admin123</strong>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  /* ── Role selection ──────────────────────────────────────── */
+  let selectedRole = 'admin';
+
+  document.querySelectorAll('.role-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      selectedRole = tab.dataset.role;
+      document.querySelectorAll('.role-tab').forEach(t => {
+        t.classList.toggle('active', t === tab);
+        t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+      });
+    });
+  });
+
+  /* ── Redirect if already logged in ──────────────────────── */
+  (() => {
+    if (API.isLoggedIn()) {
+      const u = API.getUser();
+      window.location.replace(`pages/${u.role}-dashboard.html`);
+    }
+  })();
+
+  /* ── Login submission ────────────────────────────────────── */
+  const form    = document.getElementById('login-form');
+  const btn     = document.getElementById('login-btn');
+  const errBox  = document.getElementById('login-err');
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    errBox.style.display = 'none';
+    errBox.textContent   = '';
+    btn.disabled         = true;
+    btn.innerHTML        = '<span class="spinner"></span> Signing in…';
+
+    try {
+      const data = await API.login(
+        document.getElementById('username').value.trim(),
+        document.getElementById('password').value,
+        selectedRole
+      );
+      window.location.replace(`pages/${data.role}-dashboard.html`);
+    } catch (err) {
+      errBox.textContent   = err.message || 'Login failed. Please try again.';
+      errBox.style.display = 'block';
+    } finally {
+      btn.disabled  = false;
+      btn.innerHTML = 'Sign In';
+    }
+  });
+</script>
+</body>
+</html>

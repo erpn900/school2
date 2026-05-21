@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assignments – SchooLama</title>
+  <link rel="icon" href="../favicon.ico">
+  <link rel="stylesheet" href="../css/style.css">
+  <script>window.BACKEND_URL = 'https://script.google.com/macros/s/AKfycbz42jbxkFCmq0F9F8jo7kka9PuYraYBO8vU1z0FSkVRxmHVt069gy9JYdP06K5-vrECRw/exec';<\/script>
+</head>
+<body>
+<div class="app-layout">
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <span class="topbar-title" id="page-title">Assignments</span>
+      </div>
+      <div class="topbar-right">
+        <button class="topbar-icon-btn" aria-label="Notifications">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
+          </svg>
+          <span class="topbar-badge"></span>
+        </button>
+      </div>
+    </header>
+
+    <main class="page-content fade-in">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Assignments</h1>
+          <p class="page-subtitle" id="record-count">Loading…</p>
+        </div>
+        <button class="btn btn-primary" id="add-btn">+ Add Assignment</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header" style="flex-wrap:wrap;gap:.75rem;">
+          <div class="search-bar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <input id="search-input" class="form-control" type="search"
+                   placeholder="Search Assignments…" aria-label="Search">
+          </div>
+        </div>
+
+        <div class="table-wrapper" style="border:none;border-radius:0;box-shadow:none;">
+          <table>
+            <thead id="table-head"></thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+
+        <div class="pagination" id="pagination"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../js/api.js"><\/script>
+<script src="../js/utils.js"><\/script>
+<script src="../js/sidebar.js"><\/script>
+<script src="../js/crud-page.js"><\/script>
+<script>
+  buildSidebar('Assignments');
+
+  const COLUMNS = [{"key":"title","label":"Title"},{"key":"subject","label":"Subject"},{"key":"class","label":"Class"},{"key":"dueDate","label":"Due Date"}];
+  const FIELDS  = [{"name":"title","label":"Assignment Title","required":true},{"name":"subject","label":"Subject"},{"name":"class","label":"Class"},{"name":"dueDate","label":"Due Date","type":"date"},{"name":"description","label":"Description","type":"textarea"}];
+
+  const crud = new CrudPage({
+    sheet:      'Assignments',
+    columns:    COLUMNS,
+    formFields: FIELDS,
+  });
+
+  // Update subtitle with record count after load
+  const _orig = crud.loadPage.bind(crud);
+  crud.loadPage = async function(page) {
+    await _orig(page);
+    const sub = document.getElementById('record-count');
+    if (sub) sub.textContent = crud.totalRecords + ' record' + (crud.totalRecords !== 1 ? 's' : '');
+  };
+  crud.loadPage(1);
+<\/script>
+</body>
+</html>

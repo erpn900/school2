@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teacher Dashboard – SchooLama</title>
+  <link rel="icon" href="../favicon.ico">
+  <link rel="stylesheet" href="../css/style.css">
+  <script>window.BACKEND_URL = 'https://script.google.com/macros/s/AKfycbz42jbxkFCmq0F9F8jo7kka9PuYraYBO8vU1z0FSkVRxmHVt069gy9JYdP06K5-vrECRw/exec';</script>
+</head>
+<body>
+<div class="app-layout">
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <span class="topbar-title" id="page-title">Teacher Dashboard</span>
+      </div>
+      <div class="topbar-right">
+        <button class="topbar-icon-btn" aria-label="Notifications">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+    <main class="page-content fade-in">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title" id="greeting">Good day 👋</h1>
+          <p class="page-subtitle" id="today-date"></p>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-icon blue">🎓</div><div class="stat-info"><div class="stat-value" id="stat-students">—</div><div class="stat-label">My Students</div></div></div>
+        <div class="stat-card"><div class="stat-icon amber">📖</div><div class="stat-info"><div class="stat-value" id="stat-lessons">—</div><div class="stat-label">Lessons This Week</div></div></div>
+        <div class="stat-card"><div class="stat-icon green">📝</div><div class="stat-info"><div class="stat-value" id="stat-assignments">—</div><div class="stat-label">Open Assignments</div></div></div>
+        <div class="stat-card"><div class="stat-icon red">✅</div><div class="stat-info"><div class="stat-value" id="stat-attendance">—</div><div class="stat-label">Avg Attendance %</div></div></div>
+      </div>
+      <div class="dashboard-grid">
+        <div class="card"><div class="card-header"><h2 class="card-title">Quick Links</h2></div><div class="card-body"><div class="quick-actions">
+          <a href="lessons.html" class="quick-action"><div class="quick-action-icon">📖</div>Lessons</a>
+          <a href="exams.html" class="quick-action"><div class="quick-action-icon">📝</div>Exams</a>
+          <a href="assignments.html" class="quick-action"><div class="quick-action-icon">📋</div>Assignments</a>
+          <a href="attendance.html" class="quick-action"><div class="quick-action-icon">✅</div>Attendance</a>
+          <a href="events.html" class="quick-action"><div class="quick-action-icon">📅</div>Events</a>
+          <a href="announcements.html" class="quick-action"><div class="quick-action-icon">📢</div>Announcements</a>
+        </div></div></div>
+        <div class="card"><div class="card-header"><h2 class="card-title">Announcements</h2><a href="announcements.html" class="btn btn-ghost btn-sm">View all →</a></div>
+          <div class="card-body" id="announcements-list"><span class="spinner spinner-dark" style="margin:0 auto;display:block"></span></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="../js/api.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/sidebar.js"></script>
+<script>
+  const user = buildSidebar('Dashboard');
+  if (user) {
+    const hour = new Date().getHours();
+    const g = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    document.getElementById('greeting').textContent = `${g}, ${user.name || user.username} 👋`;
+    document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  }
+  async function load() {
+    try {
+      const d = await API.getDashboard();
+      if (d.students    !== undefined) document.getElementById('stat-students').textContent = d.students;
+      if (d.lessons     !== undefined) document.getElementById('stat-lessons').textContent = d.lessons;
+      if (d.assignments !== undefined) document.getElementById('stat-assignments').textContent = d.assignments;
+      if (d.attendance  !== undefined) document.getElementById('stat-attendance').textContent = (d.attendance ?? '—') + (d.attendance ? '%' : '');
+      const el = document.getElementById('announcements-list');
+      if (d.announcements?.length) {
+        el.innerHTML = d.announcements.slice(0,3).map(a => `
+          <div style="padding:.75rem 0;border-bottom:1px solid var(--border)">
+            <div style="font-size:.875rem;font-weight:600">${a.title}</div>
+            <div class="text-xs text-muted">${a.date ?? ''}</div>
+          </div>`).join('');
+      } else {
+        el.innerHTML = '<p class="text-sm text-muted" style="text-align:center;padding:1rem">No announcements.</p>';
+      }
+    } catch(e) { console.warn(e); }
+  }
+  load();
+</script>
+</body>
+</html>
